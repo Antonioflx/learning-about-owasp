@@ -1,0 +1,36 @@
+{
+  "name": "learning-about-owasp",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:seed": "tsx src/db/seed.ts",
+    "check": "biome check --write .",
+    "format": "biome format --write .",
+    "lint": "biome lint --write ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jose": "^6.2.3",
+    "pg": "^8.21.0",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.9.1",
+    "@types/pg": "^8.20.0",
+    "@types/swagger-ui-express": "^4.1.8",
+    "tsx": "^4.19.4",
+    "typescript": "^6.0.3"
+  }
+}
