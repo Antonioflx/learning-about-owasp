@@ -50,6 +50,16 @@ export const swaggerSpec = {
 			description:
 				'Versão auditada da lib: sem side effects. Prevenção complementada por `npm audit --audit-level=moderate` no CI (`.github/workflows/audit.yml`) e `package-lock.json` fixado no repositório.',
 		},
+		{
+			name: 'A04 — Vulnerável',
+			description:
+				'Falhas criptográficas: senha salva em texto puro, JWT assinado com secret `abc123` hardcoded no código, sem expiração, `password_hash` exposto na resposta.',
+		},
+		{
+			name: 'A04 — Protegido',
+			description:
+				'`bcrypt` com 12 salt rounds, JWT secret carregado de `process.env.JWT_SECRET`, expiração de 2h, resposta nunca retorna hash ou campos internos.',
+		},
 	],
 	paths: {
 		'/a01/login': {
@@ -277,6 +287,164 @@ export const swaggerSpec = {
 							},
 						},
 					},
+				},
+			},
+		},
+		'/a04/vulnerable/register': {
+			post: {
+				tags: ['A04 — Vulnerável'],
+				summary: '[Plaintext] Salva senha em texto puro',
+				description:
+					'**Vulnerabilidade:** A senha é armazenada diretamente no banco sem hash. Se o banco vazar, todas as senhas ficam expostas imediatamente.\n\n**Resposta:** retorna `password_stored_as` com a senha em claro para evidenciar o problema.',
+				requestBody: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: {
+								type: 'object',
+								required: ['name', 'email', 'password'],
+								properties: {
+									name: { type: 'string', example: 'Dave Vulnerable' },
+									email: { type: 'string', example: 'dave@example.com' },
+									password: { type: 'string', example: 'minhasenha123' },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					201: {
+						description: 'Usuário criado com senha em texto puro',
+						content: {
+							'application/json': {
+								schema: {
+									type: 'object',
+									properties: {
+										message: { type: 'string' },
+										password_stored_as: { type: 'string', example: 'minhasenha123' },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		'/a04/vulnerable/login': {
+			post: {
+				tags: ['A04 — Vulnerável'],
+				summary: '[Weak JWT] Login com secret hardcoded e sem expiração',
+				description:
+					'**Vulnerabilidades:**\n- Compara senha com `===` direto no plaintext\n- JWT assinado com `abc123` hardcoded — qualquer pessoa que leia o código consegue forjar tokens\n- JWT sem `expiresIn` — token válido para sempre\n- Resposta inclui `password_hash` (que aqui é plaintext)\n\n**Teste:** registre com `/a04/vulnerable/register`, depois faça login aqui.',
+				requestBody: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: {
+								type: 'object',
+								required: ['email', 'password'],
+								properties: {
+									email: { type: 'string', example: 'dave@example.com' },
+									password: { type: 'string', example: 'minhasenha123' },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					200: {
+						description: 'Token gerado com secret fraco + password_hash exposto',
+						content: {
+							'application/json': {
+								schema: {
+									type: 'object',
+									properties: {
+										token: { type: 'string' },
+										password_hash: { type: 'string', description: 'Exposto na resposta — nunca fazer isso' },
+									},
+								},
+							},
+						},
+					},
+					401: { description: 'Credenciais inválidas' },
+				},
+			},
+		},
+		'/a04/protected/register': {
+			post: {
+				tags: ['A04 — Protegido'],
+				summary: '[bcrypt] Salva senha com hash de 12 rounds',
+				description:
+					'**Proteção:** `bcrypt.hash(password, 12)` gera um hash irreversível com salt aleatório. Mesmo que o banco vaze, as senhas não ficam expostas — um ataque de força bruta em bcrypt com 12 rounds leva anos por senha.\n\n**Resposta:** não retorna nenhum dado sensível.',
+				requestBody: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: {
+								type: 'object',
+								required: ['name', 'email', 'password'],
+								properties: {
+									name: { type: 'string', example: 'Eve Protected' },
+									email: { type: 'string', example: 'eve@example.com' },
+									password: { type: 'string', example: 'minhasenha123' },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					201: {
+						description: 'Usuário criado com senha hasheada',
+						content: {
+							'application/json': {
+								schema: {
+									type: 'object',
+									properties: {
+										message: { type: 'string' },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		'/a04/protected/login': {
+			post: {
+				tags: ['A04 — Protegido'],
+				summary: '[bcrypt + JWT seguro] Login com hash e secret via env',
+				description:
+					'**Proteções:**\n- `bcrypt.compare` valida a senha contra o hash (sem expor o hash)\n- JWT assinado com `process.env.JWT_SECRET` (nunca hardcoded)\n- JWT com `expiresIn: 2h`\n- Resposta retorna apenas o token — nenhum campo interno\n\n**Teste:** registre com `/a04/protected/register`, depois faça login aqui.',
+				requestBody: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: {
+								type: 'object',
+								required: ['email', 'password'],
+								properties: {
+									email: { type: 'string', example: 'eve@example.com' },
+									password: { type: 'string', example: 'minhasenha123' },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					200: {
+						description: 'Token gerado — sem dados sensíveis na resposta',
+						content: {
+							'application/json': {
+								schema: {
+									type: 'object',
+									properties: {
+										token: { type: 'string' },
+									},
+								},
+							},
+						},
+					},
+					401: { description: 'Credenciais inválidas' },
 				},
 			},
 		},

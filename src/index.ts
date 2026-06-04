@@ -3,6 +3,7 @@ import express from 'express'
 import swaggerUi from 'swagger-ui-express'
 import { swaggerSpec } from '@/docs/swagger.js'
 import { router as accessControlRouter } from '@/modules/access-control/routes.js'
+import { router as cryptographicFailuresRouter } from '@/modules/cryptographic-failures/routes.js'
 import { errorHandler } from '@/modules/errors/error.middleware.js'
 import { router as securityMisconfigurationRouter } from '@/modules/security-misconfiguration/routes.js'
 import { router as supplyChainRouter } from '@/modules/supply-chain/routes.js'
@@ -15,6 +16,7 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 app.use('/a01', accessControlRouter)
 app.use('/a02', securityMisconfigurationRouter)
 app.use('/a03', supplyChainRouter)
+app.use('/a04', cryptographicFailuresRouter)
 
 app.use(errorHandler)
 

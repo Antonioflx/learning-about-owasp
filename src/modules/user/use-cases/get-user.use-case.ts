@@ -1,5 +1,5 @@
 import { db } from '@/db/client.js'
-import { UserEntity } from '@/modules/user/user.entity.js'
+import { UserEntity } from '../user.entity.js'
 
 export async function getUserById(id: string): Promise<UserEntity | null> {
 	const result = await db.query(

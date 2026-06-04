@@ -22,30 +22,38 @@ Cada vulnerabilidade é implementada duas vezes — uma rota **vulnerável** (o 
 ```
 src/
 ├── db/
-│   ├── client.ts           # conexão PostgreSQL
-│   ├── migrate.ts          # criação das tabelas
+│   ├── client.ts              # conexão PostgreSQL
+│   ├── migrate.ts             # criação das tabelas
 │   └── seed/
-│       ├── users.seed.ts   # dados iniciais de usuários
-│       └── seed.ts         # agregador de seeds
+│       ├── users.seed.ts      # dados iniciais de usuários
+│       └── seed.ts            # agregador de seeds
 ├── modules/
-│   ├── access-control/     # A01 — Broken Access Control
+│   ├── access-control/        # A01 — Broken Access Control
 │   │   ├── controllers/
-│   │   │   ├── protected.controller.ts
-│   │   │   └── vulnerable.controller.ts
-│   │   ├── middleware/
-│   │   │   └── index.ts    # verifyToken, requireRole, verifyOwnership
-│   │   ├── use-cases/
-│   │   │   ├── get-user.use-case.ts
-│   │   │   └── delete-user.use-case.ts
+│   │   ├── middleware/        # verifyToken, requireRole, verifyOwnership
+│   │   └── routes.ts
+│   ├── security-misconfiguration/  # A02 — Security Misconfiguration
+│   │   ├── controllers/
+│   │   ├── middleware/        # vulnerableCors, protectedCors, secureHeaders
+│   │   └── routes.ts
+│   ├── supply-chain/          # A03 — Software Supply Chain Failures
+│   │   ├── controllers/
+│   │   ├── lib/               # malicious-util.ts, safe-util.ts
+│   │   └── routes.ts
+│   ├── cryptographic-failures/ # A04 — Cryptographic Failures
+│   │   ├── controllers/
 │   │   └── routes.ts
 │   ├── errors/
 │   │   ├── http-error.entity.ts   # HttpError, NotFoundError, ForbiddenError…
 │   │   └── error.middleware.ts    # handler global de erros
+│   ├── response/
+│   │   └── http-response.ts   # HttpResponse com ok<T>, created<T>, noContent
 │   └── user/
-│       └── user.entity.ts         # UserEntity com isAdmin(), isUser()
+│       ├── use-cases/         # get, delete, register, find-for-auth
+│       └── user.entity.ts     # UserEntity — isAdmin(), isUser()
 ├── types/
-│   └── express.d.ts        # augmentação de Request com UserEntity
-└── index.ts                # bootstrap do app
+│   └── express.d.ts           # augmentação de Request com UserEntity
+└── index.ts                   # bootstrap do app
 ```
 
 ---
@@ -92,7 +100,7 @@ chore:    tarefas de manutenção (deps, config, build)
 | A01 | Broken Access Control | ✅ |
 | A02 | Security Misconfiguration | ✅ |
 | A03 | Software Supply Chain Failures | ✅ |
-| A04 | Cryptographic Failures | 🔜 |
+| A04 | Cryptographic Failures | ✅ |
 | A05 | Injection | 🔜 |
 | A06 | Insecure Design | 🔜 |
 | A07 | Authentication Failures | 🔜 |
@@ -139,6 +147,18 @@ Dependências comprometidas que executam código malicioso além da função dec
 - `.github/workflows/audit.yml` — `npm audit --audit-level=moderate` bloqueia o build em todo push/PR se houver CVE
 - `npm ci` no CI — respeita o lockfile estritamente (não atualiza nada)
 - Scripts locais: `npm run audit`, `npm run outdated`
+
+### A04 — Cryptographic Failures
+
+Dados sensíveis sem proteção adequada — senhas em texto puro e JWT com chave fraca hardcoded.
+
+**Rotas vulneráveis** (`/a04/vulnerable/...`)
+- `POST /vulnerable/register` — senha salva em texto puro no banco; resposta retorna `password_stored_as` evidenciando o problema
+- `POST /vulnerable/login` — compara plaintext com `===`, JWT assinado com `'abc123'` hardcoded, sem expiração, resposta expõe `password_hash`
+
+**Rotas protegidas** (`/a04/protected/...`)
+- `POST /protected/register` — `bcrypt.hash(password, 12)` — hash irreversível com salt aleatório
+- `POST /protected/login` — `bcrypt.compare`, JWT via `process.env.JWT_SECRET`, expiração 2h, resposta retorna apenas o token
 
 ---
 

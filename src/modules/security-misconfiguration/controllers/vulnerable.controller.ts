@@ -1,8 +1,9 @@
 import type { Request, Response } from 'express'
+import { HttpResponse } from '@/modules/response/http-response.js'
 
 // VULNERÁVEL — X-Powered-By: Express exposto, CORS aberto
 export function getInfo(_req: Request, res: Response) {
-	res.json({
+	new HttpResponse(res).ok({
 		message: 'Rota vulnerável — inspecione os headers da resposta',
 		hint: 'X-Powered-By revela a stack; Access-Control-Allow-Origin aceita qualquer origem',
 	})
