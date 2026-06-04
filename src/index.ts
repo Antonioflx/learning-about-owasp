@@ -4,6 +4,7 @@ import swaggerUi from 'swagger-ui-express'
 import { swaggerSpec } from '@/docs/swagger.js'
 import { router as accessControlRouter } from '@/modules/access-control/routes.js'
 import { errorHandler } from '@/modules/errors/error.middleware.js'
+import { router as securityMisconfigurationRouter } from '@/modules/security-misconfiguration/routes.js'
 
 const app = express()
 
@@ -11,6 +12,7 @@ app.use(express.json())
 
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 app.use('/a01', accessControlRouter)
+app.use('/a02', securityMisconfigurationRouter)
 
 app.use(errorHandler)
 

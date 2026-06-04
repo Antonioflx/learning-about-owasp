@@ -30,6 +30,16 @@ export const swaggerSpec = {
 			description:
 				'Rotas com ownership check (GET) e RBAC (DELETE).',
 		},
+		{
+			name: 'A02 — Vulnerável',
+			description:
+				'Express com configuração padrão: `X-Powered-By` exposto, CORS aberto para qualquer origem, stack trace vazando em erros.',
+		},
+		{
+			name: 'A02 — Protegido',
+			description:
+				'`helmet` ativo (remove `X-Powered-By`, adiciona CSP, HSTS, X-Frame-Options), CORS restrito, erro genérico em produção.',
+		},
 	],
 	paths: {
 		'/a01/login': {
@@ -159,6 +169,127 @@ export const swaggerSpec = {
 					401: { description: 'Token ausente ou inválido' },
 					403: { description: 'Acesso negado: privilégio insuficiente' },
 					404: { description: 'Usuário não encontrado' },
+				},
+			},
+		},
+		'/a02/vulnerable/info': {
+			get: {
+				tags: ['A02 — Vulnerável'],
+				summary: '[Misconfiguration] Headers padrão do Express',
+				description:
+					'**Vulnerabilidade:** `X-Powered-By: Express` presente na resposta — informa o atacante sobre a stack.\n\n**Como testar:** Execute e abra a aba **"Response headers"** abaixo. Procure `x-powered-by: Express` e a ausência de headers como `x-frame-options` e `strict-transport-security`.\n\n**CORS:** Aceita `Origin: http://evil.com` sem restrição.',
+				responses: {
+					200: {
+						description: 'Resposta com headers inseguros',
+						headers: {
+							'X-Powered-By': {
+								description: 'Revela que o servidor usa Express',
+								schema: { type: 'string', example: 'Express' },
+							},
+							'Access-Control-Allow-Origin': {
+								description: 'CORS aberto para qualquer origem',
+								schema: { type: 'string', example: '*' },
+							},
+						},
+						content: {
+							'application/json': {
+								schema: {
+									type: 'object',
+									properties: {
+										message: { type: 'string' },
+										hint: { type: 'string' },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		'/a02/vulnerable/error': {
+			get: {
+				tags: ['A02 — Vulnerável'],
+				summary: '[Stack Trace] Erro expõe internals do servidor',
+				description:
+					'**Vulnerabilidade:** O handler de erro devolve `stack`, `path` e `method` na resposta — o atacante mapeia a estrutura interna da aplicação.\n\n**Resposta esperada:**\n```json\n{\n  "error": "Falha interna simulada",\n  "stack": "Error: ...\\n    at triggerError (.../vulnerable.controller.ts:8:9)\\n    at ...",\n  "path": "/error",\n  "method": "GET"\n}\n```',
+				responses: {
+					500: {
+						description: 'Erro com stack trace completo exposto',
+						content: {
+							'application/json': {
+								schema: {
+									type: 'object',
+									properties: {
+										error: { type: 'string' },
+										stack: { type: 'string', description: 'Stack trace completo — nunca expor em produção' },
+										path: { type: 'string' },
+										method: { type: 'string' },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		'/a02/protected/info': {
+			get: {
+				tags: ['A02 — Protegido'],
+				summary: '[helmet] Headers de segurança ativos',
+				description:
+					'**Proteção:** `helmet()` remove `X-Powered-By` e injeta automaticamente:\n- `X-Frame-Options: SAMEORIGIN` — bloqueia clickjacking\n- `X-Content-Type-Options: nosniff` — evita MIME sniffing\n- `Strict-Transport-Security` — força HTTPS\n- `Content-Security-Policy` — restringe fontes de scripts\n\n**Como testar:** Execute e abra **"Response headers"**. Compare com a rota vulnerável — `x-powered-by` ausente, novos headers presentes.\n\n**CORS:** Origem `http://evil.com` é bloqueada.',
+				responses: {
+					200: {
+						description: 'Resposta com headers de segurança do helmet',
+						headers: {
+							'X-Frame-Options': {
+								description: 'Proteção contra clickjacking',
+								schema: { type: 'string', example: 'SAMEORIGIN' },
+							},
+							'X-Content-Type-Options': {
+								description: 'Proteção contra MIME sniffing',
+								schema: { type: 'string', example: 'nosniff' },
+							},
+							'Strict-Transport-Security': {
+								description: 'Força HTTPS',
+								schema: { type: 'string', example: 'max-age=15552000; includeSubDomains' },
+							},
+						},
+						content: {
+							'application/json': {
+								schema: {
+									type: 'object',
+									properties: {
+										message: { type: 'string' },
+										hint: { type: 'string' },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		'/a02/protected/error': {
+			get: {
+				tags: ['A02 — Protegido'],
+				summary: '[Error Handler] Erro genérico sem internals',
+				description:
+					'**Proteção:** O handler de erro global retorna apenas uma mensagem genérica — nenhum detalhe interno chega ao cliente.\n\n**Resposta esperada:**\n```json\n{\n  "error": "Erro interno do servidor"\n}\n```',
+				responses: {
+					500: {
+						description: 'Erro genérico sem stack trace',
+						content: {
+							'application/json': {
+								schema: {
+									type: 'object',
+									properties: {
+										error: { type: 'string', example: 'Erro interno do servidor' },
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},

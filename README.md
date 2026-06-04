@@ -90,7 +90,7 @@ chore:    tarefas de manutenção (deps, config, build)
 | # | Categoria | Status |
 |---|-----------|--------|
 | A01 | Broken Access Control | ✅ |
-| A02 | Security Misconfiguration | 🔜 |
+| A02 | Security Misconfiguration | ✅ |
 | A03 | Software Supply Chain Failures | 🔜 |
 | A04 | Cryptographic Failures | 🔜 |
 | A05 | Injection | 🔜 |
@@ -111,6 +111,18 @@ Usuários acessando dados ou executando ações fora das suas permissões.
 **Rotas protegidas** (`/a01/protected/...`)
 - `GET /protected/users/:id` — middleware `verifyOwnership` bloqueia se `token.id !== params.id`
 - `DELETE /protected/admin/users/:id` — middleware `requireRole(u => u.isAdmin())` bloqueia não-admins com 403
+
+### A02 — Security Misconfiguration
+
+Configurações padrão inseguras expõem detalhes da stack e abrem brechas de CORS.
+
+**Rotas vulneráveis** (`/a02/vulnerable/...`)
+- `GET /vulnerable/info` — `X-Powered-By: Express` presente; CORS aceita qualquer origem (`*`)
+- `GET /vulnerable/error` — handler devolve `stack`, `path` e `method` ao cliente
+
+**Rotas protegidas** (`/a02/protected/...`)
+- `GET /protected/info` — `helmet()` remove `X-Powered-By` e injeta `X-Frame-Options`, `Strict-Transport-Security`, `Content-Security-Policy`; CORS restrito à origem configurada
+- `GET /protected/error` — handler genérico retorna apenas `{ "error": "Erro interno do servidor" }`
 
 ---
 
