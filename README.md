@@ -101,7 +101,7 @@ chore:    tarefas de manutenção (deps, config, build)
 | A02 | Security Misconfiguration | ✅ |
 | A03 | Software Supply Chain Failures | ✅ |
 | A04 | Cryptographic Failures | ✅ |
-| A05 | Injection | 🔜 |
+| A05 | Injection | ✅ |
 | A06 | Insecure Design | 🔜 |
 | A07 | Authentication Failures | 🔜 |
 | A08 | Software or Data Integrity Failures | 🔜 |
@@ -159,6 +159,16 @@ Dados sensíveis sem proteção adequada — senhas em texto puro e JWT com chav
 **Rotas protegidas** (`/a04/protected/...`)
 - `POST /protected/register` — `bcrypt.hash(password, 12)` — hash irreversível com salt aleatório
 - `POST /protected/login` — `bcrypt.compare`, JWT via `process.env.JWT_SECRET`, expiração 2h, resposta retorna apenas o token
+
+### A05 — Injection
+
+Input do usuário enviado diretamente a interpretadores (SQL, shell).
+
+**Rotas vulneráveis** (`/a05/vulnerable/...`)
+- `GET /vulnerable/users?email=` — SQL concatenado: `' OR '1'='1` retorna todos os usuários
+
+**Rotas protegidas** (`/a05/protected/...`)
+- `GET /protected/users?email=` — `zod` valida o email; query usa `$1` (parameterizada) — injeção impossível
 
 ---
 

@@ -60,6 +60,16 @@ export const swaggerSpec = {
 			description:
 				'`bcrypt` com 12 salt rounds, JWT secret carregado de `process.env.JWT_SECRET`, expiração de 2h, resposta nunca retorna hash ou campos internos.',
 		},
+		{
+			name: 'A05 — Vulnerável',
+			description:
+				'SQL Injection via query concatenada e Command Injection via `exec` com shell. Input do usuário enviado diretamente ao interpretador.',
+		},
+		{
+			name: 'A05 — Protegido',
+			description:
+				'Query parametrizada (`$1`) e `execFile` sem shell. Validação de input com `zod` antes de qualquer operação.',
+		},
 	],
 	paths: {
 		'/a01/login': {
@@ -287,6 +297,45 @@ export const swaggerSpec = {
 							},
 						},
 					},
+				},
+			},
+		},
+		'/a05/vulnerable/users': {
+			get: {
+				tags: ['A05 — Vulnerável'],
+				summary: '[SQL Injection] Query concatenada — email vira SQL',
+				description:
+					'**Vulnerabilidade:** o `email` é interpolado diretamente na string SQL.\n\n**Payload:** `\' OR \'1\'=\'1` → retorna todos os usuários do banco.',
+				parameters: [
+					{
+						name: 'email',
+						in: 'query',
+						required: true,
+						schema: { type: 'string', example: "' OR '1'='1" },
+					},
+				],
+				responses: {
+					200: { description: 'Resultado da query — potencialmente todos os usuários' },
+				},
+			},
+		},
+		'/a05/protected/users': {
+			get: {
+				tags: ['A05 — Protegido'],
+				summary: '[Parameterized Query] email validado com zod + query $1',
+				description:
+					'**Proteção:** `zod` valida que o input é um email bem formado antes de qualquer operação. A query usa `$1` — o driver `pg` envia o valor separado do SQL, tornando injeção impossível.\n\n**Teste:** tente o payload `\' OR \'1\'=\'1` — retorna 400.',
+				parameters: [
+					{
+						name: 'email',
+						in: 'query',
+						required: true,
+						schema: { type: 'string', example: 'alice@example.com' },
+					},
+				],
+				responses: {
+					200: { description: 'Resultado filtrado pelo email exato' },
+					400: { description: 'Email inválido rejeitado pelo zod' },
 				},
 			},
 		},
