@@ -2,24 +2,24 @@ type Role = 'admin' | 'user'
 
 interface UserProps {
 	id: string
+	name: string
 	email: string
 	role: Role
-	name?: string
 	token?: string
 }
 
 export class UserEntity {
 	readonly id: string
+	readonly name: string
 	readonly email: string
 	readonly role: Role
-	readonly name?: string
 	readonly token?: string
 
 	private constructor(props: UserProps) {
 		this.id = props.id
+		this.name = props.name
 		this.email = props.email
 		this.role = props.role
-		if (props.name !== undefined) this.name = props.name
 		if (props.token !== undefined) this.token = props.token
 	}
 
@@ -31,18 +31,20 @@ export class UserEntity {
 		return this.role === 'user'
 	}
 
-	static fromDb(row: { id: string; email: string; role: string; name?: string }): UserEntity {
+	// DB garante name NOT NULL — campo obrigatório
+	static fromDb(row: { id: string; name: string; email: string; role: string }): UserEntity {
 		return new UserEntity({
 			id: row.id,
+			name: row.name,
 			email: row.email,
 			role: row.role as Role,
-			...(row.name !== undefined && { name: row.name }),
 		})
 	}
 
-	static fromJwt(payload: { id: string; email: string; role: string }, token: string): UserEntity {
+	static fromJwt(payload: { id: string; name: string; email: string; role: string }, token: string): UserEntity {
 		return new UserEntity({
 			id: payload.id,
+			name: payload.name,
 			email: payload.email,
 			role: payload.role as Role,
 			token,

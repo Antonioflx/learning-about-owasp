@@ -11,7 +11,9 @@
     "db:seed": "tsx src/db/seed.ts",
     "check": "biome check --write .",
     "format": "biome format --write .",
-    "lint": "biome lint --write ."
+    "lint": "biome lint --write .",
+    "audit": "npm audit --audit-level=moderate",
+    "outdated": "npm outdated"
   },
   "keywords": [],
   "author": "",

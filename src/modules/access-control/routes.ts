@@ -15,7 +15,7 @@ router.post('/login', async (req, res) => {
 	const { email } = req.body as { email: string }
 
 	const result = await db.query(
-		'SELECT id, email, role FROM users WHERE email = $1',
+		'SELECT id, name, email, role FROM users WHERE email = $1',
 		[email],
 	)
 
@@ -28,6 +28,7 @@ router.post('/login', async (req, res) => {
 
 	const token = await new SignJWT({
 		id: user.id,
+		name: user.name,
 		email: user.email,
 		role: user.role,
 	})
@@ -35,7 +36,7 @@ router.post('/login', async (req, res) => {
 		.setExpirationTime('2h')
 		.sign(secret)
 
-	res.json({ token, user: { id: user.id, email: user.email, role: user.role } })
+	res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } })
 })
 
 // ─── Rotas Vulneráveis ────────────────────────────────────────────────────────

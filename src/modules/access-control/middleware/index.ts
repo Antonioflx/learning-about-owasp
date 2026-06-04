@@ -14,7 +14,7 @@ export async function verifyToken(req: Request, _res: Response, next: NextFuncti
 
 	try {
 		const { payload } = await jwtVerify(token, secret)
-		req.user = UserEntity.fromJwt(payload as { id: string; email: string; role: string }, token)
+		req.user = UserEntity.fromJwt(payload as { id: string; name: string; email: string; role: string }, token)
 		next()
 	} catch {
 		throw new UnauthorizedError('Token inválido')

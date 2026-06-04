@@ -40,6 +40,16 @@ export const swaggerSpec = {
 			description:
 				'`helmet` ativo (remove `X-Powered-By`, adiciona CSP, HSTS, X-Frame-Options), CORS restrito, erro genérico em produção.',
 		},
+		{
+			name: 'A03 — Vulnerável',
+			description:
+				'Dependência sem auditoria: a função `formatUsername` faz o que promete mas tem um side effect escondido que exfiltra o input para um servidor externo — padrão real do ataque `event-stream` (2018) e `node-ipc` (2022).',
+		},
+		{
+			name: 'A03 — Protegido',
+			description:
+				'Versão auditada da lib: sem side effects. Prevenção complementada por `npm audit --audit-level=moderate` no CI (`.github/workflows/audit.yml`) e `package-lock.json` fixado no repositório.',
+		},
 	],
 	paths: {
 		'/a01/login': {
@@ -262,6 +272,81 @@ export const swaggerSpec = {
 									properties: {
 										message: { type: 'string' },
 										hint: { type: 'string' },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		'/a03/vulnerable/process': {
+			post: {
+				tags: ['A03 — Vulnerável'],
+				summary: '[Compromised Dep] formatUsername com side effect de exfiltração',
+				description:
+					'**Vulnerabilidade:** `formatUsername` vem de uma lib sem auditoria. Além de formatar o nome, ela faz um `fetch` silencioso para `attacker.example.com` com o valor recebido.\n\n**Padrão real:** `event-stream` (2018) roubava chaves de carteiras Bitcoin; `node-ipc` (2022) apagava arquivos em sistemas russos/bielorussos. Ambos passaram despercebidos porque a função principal funcionava corretamente.\n\n**Como detectar:** `npm audit`, revisão de código do `node_modules`, ferramentas como Socket.dev.',
+				requestBody: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: {
+								type: 'object',
+								required: ['name'],
+								properties: {
+									name: { type: 'string', example: 'Bob User' },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					200: {
+						description: 'Nome formatado — e silenciosamente exfiltrado',
+						content: {
+							'application/json': {
+								schema: {
+									type: 'object',
+									properties: {
+										formatted: { type: 'string', example: 'bob user' },
+										warning: { type: 'string' },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		'/a03/protected/process': {
+			post: {
+				tags: ['A03 — Protegido'],
+				summary: '[Audited Dep] formatUsername limpa — sem side effects',
+				description:
+					'**Proteção:** Lib auditada — código revisado, sem side effects. Combinada com:\n- `npm audit --audit-level=moderate` bloqueando o build no CI se houver CVE de severidade moderate ou superior\n- `package-lock.json` no repositório garantindo reprodutibilidade (impede substituição silenciosa de versões)\n- `npm ci` no CI em vez de `npm install` (respeita o lockfile)',
+				requestBody: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: {
+								type: 'object',
+								required: ['name'],
+								properties: {
+									name: { type: 'string', example: 'Bob User' },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					200: {
+						description: 'Nome formatado — sem exfiltração',
+						content: {
+							'application/json': {
+								schema: {
+									type: 'object',
+									properties: {
+										formatted: { type: 'string', example: 'bob user' },
 									},
 								},
 							},

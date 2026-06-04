@@ -91,7 +91,7 @@ chore:    tarefas de manutenção (deps, config, build)
 |---|-----------|--------|
 | A01 | Broken Access Control | ✅ |
 | A02 | Security Misconfiguration | ✅ |
-| A03 | Software Supply Chain Failures | 🔜 |
+| A03 | Software Supply Chain Failures | ✅ |
 | A04 | Cryptographic Failures | 🔜 |
 | A05 | Injection | 🔜 |
 | A06 | Insecure Design | 🔜 |
@@ -123,6 +123,22 @@ Configurações padrão inseguras expõem detalhes da stack e abrem brechas de C
 **Rotas protegidas** (`/a02/protected/...`)
 - `GET /protected/info` — `helmet()` remove `X-Powered-By` e injeta `X-Frame-Options`, `Strict-Transport-Security`, `Content-Security-Policy`; CORS restrito à origem configurada
 - `GET /protected/error` — handler genérico retorna apenas `{ "error": "Erro interno do servidor" }`
+
+### A03 — Software Supply Chain Failures
+
+Dependências comprometidas que executam código malicioso além da função declarada.
+
+**Rotas vulneráveis** (`/a03/vulnerable/...`)
+- `POST /vulnerable/process` — `formatUsername` executa o side effect malicioso além de formatar o nome (padrão real: `event-stream` 2018, `node-ipc` 2022)
+
+**Rotas protegidas** (`/a03/protected/...`)
+- `POST /protected/process` — versão auditada, sem side effects
+
+**Proteção em camadas**
+- `package-lock.json` no git — fixa versões exatas, impede upgrade silencioso
+- `.github/workflows/audit.yml` — `npm audit --audit-level=moderate` bloqueia o build em todo push/PR se houver CVE
+- `npm ci` no CI — respeita o lockfile estritamente (não atualiza nada)
+- Scripts locais: `npm run audit`, `npm run outdated`
 
 ---
 
