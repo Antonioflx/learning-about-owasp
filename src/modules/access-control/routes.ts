@@ -1,13 +1,14 @@
 import { Router } from 'express'
 import { SignJWT } from 'jose'
+import { config } from '@/config/env.config.js'
 import { db } from '@/db/client.js'
 import * as protected_ from './controllers/protected.controller.js'
 import * as vulnerable from './controllers/vulnerable.controller.js'
-import { requireRole, verifyOwnership, verifyToken } from './middleware/index.js'
+import { accessControlGuard } from './middleware/index.js'
 
 export const router = Router()
 
-const secret = new TextEncoder().encode(process.env.JWT_SECRET)
+const secret = new TextEncoder().encode(config.jwtSecret)
 
 // Login — emite token com id, email e role do usuário
 // Sem verificação de senha (foco é no A01, não em crypto — isso é A04)
@@ -42,21 +43,21 @@ router.post('/login', async (req, res) => {
 // ─── Rotas Vulneráveis ────────────────────────────────────────────────────────
 // verifyToken presente (usuário autenticado), mas sem verificar QUEM pode acessar O QUÊ
 
-router.get('/vulnerable/users/:id', verifyToken, vulnerable.getUser)
-router.delete('/vulnerable/admin/users/:id', verifyToken, vulnerable.deleteUser)
+router.get('/vulnerable/users/:id', accessControlGuard.verifyToken, vulnerable.getUser)
+router.delete('/vulnerable/admin/users/:id', accessControlGuard.verifyToken, vulnerable.deleteUser)
 
 // ─── Rotas Protegidas ─────────────────────────────────────────────────────────
 // verifyToken + middleware de autorização específico por rota
 
 router.get(
 	'/protected/users/:id',
-	verifyToken,
-	verifyOwnership,
+	accessControlGuard.verifyToken,
+	accessControlGuard.verifyOwnership,
 	protected_.getUser,
 )
 router.delete(
 	'/protected/admin/users/:id',
-	verifyToken,
-	requireRole(user => user.isAdmin()),
+	accessControlGuard.verifyToken,
+	accessControlGuard.requireRole(user => user.isAdmin()),
 	protected_.deleteUser,
 )
