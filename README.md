@@ -1,8 +1,8 @@
 # learning-about-owasp
 
-API em Node.js para estudo prático do **OWASP Top 10 (2025)**.
+Node.js API for hands-on study of the **OWASP Top 10 (2025)**.
 
-Cada vulnerabilidade é implementada duas vezes — uma rota **vulnerável** (o problema em código real) e uma rota **protegida** (a solução correta) — para que a diferença seja visível em tempo de execução.
+Each vulnerability is implemented twice — a **vulnerable** route (the problem, in real code) and a **protected** route (the correct fix) — so the difference is visible at runtime.
 
 ---
 
@@ -10,7 +10,7 @@ Cada vulnerabilidade é implementada duas vezes — uma rota **vulnerável** (o 
 
 - **Runtime:** Node.js + TypeScript
 - **Framework:** Express 5
-- **Banco:** PostgreSQL (`pg`)
+- **Database:** PostgreSQL (`pg`)
 - **Auth:** JWT via `jose`
 - **Docs:** Swagger UI (`swagger-ui-express`)
 - **Logs:** `pino` / `pino-http`
@@ -19,23 +19,23 @@ Cada vulnerabilidade é implementada duas vezes — uma rota **vulnerável** (o 
 
 ---
 
-## Estrutura
+## Structure
 
 ```
 src/
 ├── config/
-│   ├── env.config.ts          # valida e tipa as variáveis de ambiente (zod)
-│   └── logger.ts              # instância pino compartilhada (A09)
+│   ├── env.config.ts          # validates and types environment variables (zod)
+│   └── logger.ts              # shared pino instance (A09)
 ├── db/
-│   ├── client.ts              # conexão PostgreSQL
-│   ├── migrate.ts             # criação das tabelas
+│   ├── client.ts              # PostgreSQL connection
+│   ├── migrate.ts             # table creation
 │   └── seed/
-│       ├── users.seed.ts      # dados iniciais de usuários
-│       └── seed.ts            # agregador de seeds
+│       ├── users.seed.ts      # initial user data
+│       └── seed.ts            # seed aggregator
 ├── modules/
 │   ├── access-control/        # A01 — Broken Access Control
 │   │   ├── controllers/
-│   │   ├── middleware/        # verifyToken, requireRole, verifyOwnership
+│   │   ├── middleware/        # AccessControlGuard: verifyToken, requireRole, verifyOwnership
 │   │   └── routes.ts
 │   ├── security-misconfiguration/  # A02 — Security Misconfiguration
 │   │   ├── controllers/
@@ -53,8 +53,8 @@ src/
 │   │   └── routes.ts
 │   ├── insecure-design/        # A06 — Insecure Design
 │   │   ├── controllers/
-│   │   ├── lib/                # login-attempts.store.ts (lockout por e-mail)
-│   │   ├── middleware/         # rate limiter por IP
+│   │   ├── lib/                # login-attempts.store.ts (per-email lockout)
+│   │   ├── middleware/         # per-IP rate limiter
 │   │   └── routes.ts
 │   ├── authentication-failures/ # A07 — Authentication Failures
 │   │   ├── controllers/
@@ -73,53 +73,53 @@ src/
 │   │   └── routes.ts
 │   ├── errors/
 │   │   ├── http-error.entity.ts   # HttpError, NotFoundError, ForbiddenError…
-│   │   └── error.middleware.ts    # handler global de erros
+│   │   └── error.middleware.ts    # global error handler
 │   ├── response/
-│   │   └── http-response.ts   # HttpResponse com ok<T>, created<T>, noContent
+│   │   └── http-response.ts   # HttpResponse with ok<T>, created<T>, noContent
 │   └── user/
 │       ├── use-cases/         # get, delete, register, find-for-auth
 │       └── user.entity.ts     # UserEntity — isAdmin(), isUser()
 ├── types/
-│   └── express.d.ts           # augmentação de Request com UserEntity
-└── index.ts                   # bootstrap do app
+│   └── express.d.ts           # augments Request with UserEntity
+└── index.ts                   # app bootstrap
 ```
 
 ---
 
-## Como rodar
+## Getting started
 
 ```bash
-# instalar dependências
+# install dependencies
 npm install
 
-# configurar variáveis de ambiente
-cp .env.example .env   # preencher DATABASE_URL e JWT_SECRET
+# configure environment variables
+cp .env.example .env   # fill in DATABASE_URL and JWT_SECRET
 
-# criar tabelas
+# create tables
 npm run db:migrate
 
-# popular banco
+# seed the database
 npm run db:seed
 
-# iniciar em modo dev
+# start in dev mode
 npm run dev
 ```
 
-Acesse a documentação interativa em `http://localhost:3000/docs`.
+Interactive docs are available at `http://localhost:3000/docs`.
 
-As variáveis de ambiente são validadas e tipadas em [src/config/env.config.ts](src/config/env.config.ts) — se faltar alguma variável obrigatória (ex: `JWT_SECRET`), a aplicação falha ao subir com uma mensagem indicando o que está errado, em vez de quebrar silenciosamente em runtime.
+Environment variables are validated and typed in [src/config/env.config.ts](src/config/env.config.ts) — if a required variable is missing (e.g. `JWT_SECRET`), the app fails to start with a message pointing at what's wrong, instead of breaking silently at runtime.
 
 ### Docker
 
 ```bash
-cp .env.example .env   # preencher as variáveis
+cp .env.example .env   # fill in the variables
 
 docker compose up --build
 ```
 
-Sobe dois serviços: `postgres` e `api` (build a partir de [docker/Dockerfile](docker/Dockerfile), multi-stage). Ambos têm healthcheck — a API só inicia depois que o Postgres reporta `healthy` (`depends_on: condition: service_healthy`), e o próprio container da API expõe `GET /health` (checa a conexão com o banco) como `HEALTHCHECK` da imagem.
+This brings up two services: `postgres` and `api` (built from [docker/Dockerfile](docker/Dockerfile), multi-stage). Both have a healthcheck — the API only starts once Postgres reports `healthy` (`depends_on: condition: service_healthy`), and the API container itself exposes `GET /health` (checks the database connection) as the image's `HEALTHCHECK`.
 
-Depois de subir, rode as migrations dentro do container ou apontando `DATABASE_URL` para `localhost:5432` a partir do host:
+Once it's up, run the migrations either inside the container or by pointing `DATABASE_URL` at `localhost:5432` from the host:
 
 ```bash
 npm run db:migrate
@@ -128,21 +128,21 @@ npm run db:seed
 
 ---
 
-## Convenção de commits
+## Commit convention
 
 ```
-feat:     nova funcionalidade
-fix:      correção de bug
-refactor: mudança de código sem alterar comportamento
-docs:     atualização de documentação
-chore:    tarefas de manutenção (deps, config, build)
+feat:     new feature
+fix:      bug fix
+refactor: code change with no behavior change
+docs:     documentation update
+chore:    maintenance tasks (deps, config, build)
 ```
 
 ---
 
 ## OWASP Top 10 — 2025
 
-| # | Categoria | Status |
+| # | Category | Status |
 |---|-----------|--------|
 | A01 | Broken Access Control | ✅ |
 | A02 | Security Misconfiguration | ✅ |
@@ -157,126 +157,126 @@ chore:    tarefas de manutenção (deps, config, build)
 
 ### A01 — Broken Access Control
 
-Usuários acessando dados ou executando ações fora das suas permissões.
+Users acting on data or performing actions outside their permissions.
 
-**Rotas vulneráveis** (`/a01/vulnerable/...`)
-- `GET /vulnerable/users/:id` — qualquer usuário autenticado acessa dados de outro usuário (IDOR)
-- `DELETE /vulnerable/admin/users/:id` — qualquer usuário autenticado pode deletar outro sem verificação de role
+**Vulnerable routes** (`/a01/vulnerable/...`)
+- `GET /vulnerable/users/:id` — any authenticated user can access another user's data (IDOR)
+- `DELETE /vulnerable/admin/users/:id` — any authenticated user can delete another user, no role check
 
-**Rotas protegidas** (`/a01/protected/...`)
-- `GET /protected/users/:id` — middleware `verifyOwnership` bloqueia se `token.id !== params.id`
-- `DELETE /protected/admin/users/:id` — middleware `requireRole(u => u.isAdmin())` bloqueia não-admins com 403
+**Protected routes** (`/a01/protected/...`)
+- `GET /protected/users/:id` — `verifyOwnership` middleware blocks if `token.id !== params.id`
+- `DELETE /protected/admin/users/:id` — `requireRole(u => u.isAdmin())` middleware blocks non-admins with 403
 
 ### A02 — Security Misconfiguration
 
-Configurações padrão inseguras expõem detalhes da stack e abrem brechas de CORS.
+Insecure default configuration exposes stack details and opens CORS gaps.
 
-**Rotas vulneráveis** (`/a02/vulnerable/...`)
-- `GET /vulnerable/info` — `X-Powered-By: Express` presente; CORS aceita qualquer origem (`*`)
-- `GET /vulnerable/error` — handler devolve `stack`, `path` e `method` ao cliente
+**Vulnerable routes** (`/a02/vulnerable/...`)
+- `GET /vulnerable/info` — `X-Powered-By: Express` present; CORS accepts any origin (`*`)
+- `GET /vulnerable/error` — handler returns `stack`, `path` and `method` to the client
 
-**Rotas protegidas** (`/a02/protected/...`)
-- `GET /protected/info` — `helmet()` remove `X-Powered-By` e injeta `X-Frame-Options`, `Strict-Transport-Security`, `Content-Security-Policy`; CORS restrito à origem configurada
-- `GET /protected/error` — handler genérico retorna apenas `{ "error": "Erro interno do servidor" }`
+**Protected routes** (`/a02/protected/...`)
+- `GET /protected/info` — `helmet()` removes `X-Powered-By` and injects `X-Frame-Options`, `Strict-Transport-Security`, `Content-Security-Policy`; CORS restricted to the configured origin
+- `GET /protected/error` — generic handler returns only `{ "error": "Internal server error" }`
 
 ### A03 — Software Supply Chain Failures
 
-Dependências comprometidas que executam código malicioso além da função declarada.
+Compromised dependencies executing malicious code beyond their declared purpose.
 
-**Rotas vulneráveis** (`/a03/vulnerable/...`)
-- `POST /vulnerable/process` — `formatUsername` executa o side effect malicioso além de formatar o nome (padrão real: `event-stream` 2018, `node-ipc` 2022)
+**Vulnerable routes** (`/a03/vulnerable/...`)
+- `POST /vulnerable/process` — `formatUsername` runs a malicious side effect besides formatting the name (real-world pattern: `event-stream` 2018, `node-ipc` 2022)
 
-**Rotas protegidas** (`/a03/protected/...`)
-- `POST /protected/process` — versão auditada, sem side effects
+**Protected routes** (`/a03/protected/...`)
+- `POST /protected/process` — audited version, no side effects
 
-**Proteção em camadas**
-- `package-lock.json` no git — fixa versões exatas, impede upgrade silencioso
-- `.github/workflows/audit.yml` — `npm audit --audit-level=moderate` bloqueia o build em todo push/PR se houver CVE
-- `npm ci` no CI — respeita o lockfile estritamente (não atualiza nada)
-- Scripts locais: `npm run audit`, `npm run outdated`
+**Layered protection**
+- `package-lock.json` in git — pins exact versions, prevents silent upgrades
+- `.github/workflows/audit.yml` — `npm audit --audit-level=moderate` blocks the build on every push/PR if a CVE is found
+- `npm ci` in CI — strictly respects the lockfile (never updates anything)
+- Local scripts: `npm run audit`, `npm run outdated`
 
 ### A04 — Cryptographic Failures
 
-Dados sensíveis sem proteção adequada — senhas em texto puro e JWT com chave fraca hardcoded.
+Sensitive data without adequate protection — plaintext passwords and a hardcoded, weak JWT key.
 
-**Rotas vulneráveis** (`/a04/vulnerable/...`)
-- `POST /vulnerable/register` — senha salva em texto puro no banco; resposta retorna `password_stored_as` evidenciando o problema
-- `POST /vulnerable/login` — compara plaintext com `===`, JWT assinado com `'abc123'` hardcoded, sem expiração, resposta expõe `password_hash`
+**Vulnerable routes** (`/a04/vulnerable/...`)
+- `POST /vulnerable/register` — password saved in plaintext in the database; response returns `password_stored_as` to make the problem visible
+- `POST /vulnerable/login` — compares plaintext with `===`, JWT signed with a hardcoded `'abc123'`, no expiration, response exposes `password_hash`
 
-**Rotas protegidas** (`/a04/protected/...`)
-- `POST /protected/register` — `bcrypt.hash(password, 12)` — hash irreversível com salt aleatório
-- `POST /protected/login` — `bcrypt.compare`, JWT via `process.env.JWT_SECRET`, expiração 2h, resposta retorna apenas o token
+**Protected routes** (`/a04/protected/...`)
+- `POST /protected/register` — `bcrypt.hash(password, 12)` — irreversible hash with a random salt
+- `POST /protected/login` — `bcrypt.compare`, JWT via `process.env.JWT_SECRET`, 2h expiration, response returns only the token
 
 ### A05 — Injection
 
-Input do usuário enviado diretamente a interpretadores (SQL, shell).
+User input sent directly to an interpreter (SQL, shell).
 
-**Rotas vulneráveis** (`/a05/vulnerable/...`)
-- `GET /vulnerable/users?email=` — SQL concatenado: `' OR '1'='1` retorna todos os usuários
+**Vulnerable routes** (`/a05/vulnerable/...`)
+- `GET /vulnerable/users?email=` — concatenated SQL: `' OR '1'='1` returns every user
 
-**Rotas protegidas** (`/a05/protected/...`)
-- `GET /protected/users?email=` — `zod` valida o email; query usa `$1` (parameterizada) — injeção impossível
+**Protected routes** (`/a05/protected/...`)
+- `GET /protected/users?email=` — `zod` validates the email; query uses `$1` (parameterized) — injection impossible
 
 ### A06 — Insecure Design
 
-Falhas arquiteturais: enumeração de usuários pela resposta e ausência de limite de tentativas.
+Architectural flaws: user enumeration via the response, and no limit on login attempts.
 
-**Rotas vulneráveis** (`/a06/vulnerable/...`)
-- `POST /vulnerable/login` — `404 "Email não encontrado"` vs `401 "Senha incorreta"` permite mapear e-mails cadastrados; sem rate limit
+**Vulnerable routes** (`/a06/vulnerable/...`)
+- `POST /vulnerable/login` — `404 "Email não encontrado"` vs `401 "Senha incorreta"` lets an attacker map registered emails; no rate limit
 
-**Rotas protegidas** (`/a06/protected/...`)
-- `POST /protected/login` — mensagem genérica (`fail securely`), `express-rate-limit` (5 req/15min por IP) + bloqueio de 1min por e-mail após 5 falhas (`node-cache`)
+**Protected routes** (`/a06/protected/...`)
+- `POST /protected/login` — generic message (fail securely), `express-rate-limit` (5 req/15min per IP) + 1min lockout per email after 5 failures (`node-cache`)
 
 ### A07 — Authentication Failures
 
-Ciclo de vida de sessão mal implementado: token eterno e logout que não revoga nada.
+Poorly implemented session lifecycle: a token that never expires and a logout that revokes nothing.
 
-**Rotas vulneráveis** (`/a07/vulnerable/...`)
-- `POST /vulnerable/login` — JWT assinado sem `expiresIn`, válido para sempre
-- `POST /vulnerable/logout` — não invalida nada
-- `GET /vulnerable/profile` — aceita o token normalmente mesmo depois do "logout"
+**Vulnerable routes** (`/a07/vulnerable/...`)
+- `POST /vulnerable/login` — JWT signed without `expiresIn`, valid forever
+- `POST /vulnerable/logout` — invalidates nothing
+- `GET /vulnerable/profile` — accepts the token normally even after "logout"
 
-**Rotas protegidas** (`/a07/protected/...`)
-- `POST /protected/login` — access token de 15min + refresh token opaco de uso único
-- `POST /protected/refresh` — troca o refresh token (consumido no processo) por um novo par
-- `POST /protected/logout` — revoga o access token (blocklist em memória) e o refresh token
-- `GET /protected/profile` — rejeita token revogado ou expirado
+**Protected routes** (`/a07/protected/...`)
+- `POST /protected/login` — 15min access token + single-use opaque refresh token
+- `POST /protected/refresh` — exchanges the refresh token (consumed in the process) for a new pair
+- `POST /protected/logout` — revokes the access token (in-memory blocklist) and the refresh token
+- `GET /protected/profile` — rejects a revoked or expired token
 
 ### A08 — Software or Data Integrity Failures
 
-Payload processado sem verificar origem ou integridade.
+Payload processed without verifying origin or integrity.
 
-**Rotas vulneráveis** (`/a08/vulnerable/...`)
-- `POST /vulnerable/config` — aplica qualquer JSON recebido, sem checar remetente
+**Vulnerable routes** (`/a08/vulnerable/...`)
+- `POST /vulnerable/config` — applies any JSON received, without checking the sender
 
-**Rotas protegidas** (`/a08/protected/...`)
-- `POST /protected/config` — exige header `x-signature` com HMAC-SHA256 do payload (`crypto.createHmac` + `crypto.timingSafeEqual`); rejeita se não bater
+**Protected routes** (`/a08/protected/...`)
+- `POST /protected/config` — requires an `x-signature` header with an HMAC-SHA256 of the payload (`crypto.createHmac` + `crypto.timingSafeEqual`); rejects if it doesn't match
 
 ### A09 — Security Logging and Alerting Failures
 
-Logs ausentes ou insuficientes impedem detectar e investigar ataques.
+Missing or insufficient logs prevent detecting and investigating attacks.
 
-**Rotas vulneráveis** (`/a09/vulnerable/...`)
-- `POST /vulnerable/login` — `console.log` grava a senha em texto puro; erros inesperados são engolidos sem registro
+**Vulnerable routes** (`/a09/vulnerable/...`)
+- `POST /vulnerable/login` — `console.log` writes the password in plaintext; unexpected errors are swallowed with no record
 
-**Rotas protegidas** (`/a09/protected/...`)
-- `POST /protected/login` — logger estruturado `pino` (JSON): registra sucesso/falha de login e erros com IP, nunca a senha (campo redigido por config)
+**Protected routes** (`/a09/protected/...`)
+- `POST /protected/login` — structured `pino` logger (JSON): logs login success/failure and errors with IP, never the password (field redacted by config)
 
 ### A10 — Mishandling of Exceptional Conditions
 
-Promise disparada sem tratamento — o tipo de erro que derruba um processo inteiro.
+A promise fired without handling — the kind of error that takes down an entire process.
 
-**Rotas vulneráveis** (`/a10/vulnerable/...`)
-- `POST /vulnerable/process` — dispara uma tarefa assíncrona sem `await`/`.catch`; gera um `unhandledRejection` não tratado no ponto onde acontece
+**Vulnerable routes** (`/a10/vulnerable/...`)
+- `POST /vulnerable/process` — fires an async task without `await`/`.catch`; produces an unhandled rejection right where it happens
 
-**Rotas protegidas** (`/a10/protected/...`)
-- `POST /protected/process` — mesma tarefa, mas com `try/catch` e log estruturado do erro
+**Protected routes** (`/a10/protected/...`)
+- `POST /protected/process` — same task, but wrapped in `try/catch` with structured error logging
 
-**Rede de segurança global** (`src/index.ts`)
-- `process.on('unhandledRejection', ...)` e `process.on('uncaughtException', ...)` — logam via `pino` e, no caso de `uncaughtException`, encerram o processo de forma controlada (`process.exit(1)`) em vez de deixá-lo em estado indefinido
+**Global safety net** (`src/index.ts`)
+- `process.on('unhandledRejection', ...)` and `process.on('uncaughtException', ...)` — log via `pino` and, on `uncaughtException`, shut the process down in a controlled way (`process.exit(1)`) instead of leaving it in an undefined state
 
 ---
 
-## Licença
+## License
 
 MIT
