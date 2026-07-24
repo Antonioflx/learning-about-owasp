@@ -70,6 +70,56 @@ export const swaggerSpec = {
 			description:
 				'Query parametrizada (`$1`) e `execFile` sem shell. Validação de input com `zod` antes de qualquer operação.',
 		},
+		{
+			name: 'A06 — Vulnerável',
+			description:
+				'Mensagens de erro distintas revelam se um e-mail existe na base (user enumeration) e não há limite de tentativas de login.',
+		},
+		{
+			name: 'A06 — Protegido',
+			description:
+				'Mensagem genérica de erro (fail securely) + `express-rate-limit` por IP + bloqueio temporário por e-mail após 5 falhas (`node-cache`).',
+		},
+		{
+			name: 'A07 — Vulnerável',
+			description:
+				'JWT assinado sem `expiresIn` (válido para sempre) e um "logout" que não revoga nada — o token continua aceito normalmente depois.',
+		},
+		{
+			name: 'A07 — Protegido',
+			description:
+				'Access token de vida curta (15min) + refresh token opaco de uso único + blocklist de tokens revogados, checada em toda requisição autenticada.',
+		},
+		{
+			name: 'A08 — Vulnerável',
+			description:
+				'Endpoint que aplica um payload JSON recebido sem verificar origem ou integridade — qualquer remetente consegue alterar o estado da aplicação.',
+		},
+		{
+			name: 'A08 — Protegido',
+			description:
+				'Assinatura HMAC-SHA256 (`crypto.createHmac`) do payload verificada com `crypto.timingSafeEqual` antes de aplicar qualquer alteração.',
+		},
+		{
+			name: 'A09 — Vulnerável',
+			description:
+				'`console.log` solto que registra a senha em texto puro, e erros de autenticação/exceções engolidos sem nenhum registro.',
+		},
+		{
+			name: 'A09 — Protegido',
+			description:
+				'Logger estruturado (`pino`, JSON) — registra tentativas de login (sucesso/falha) e erros com IP, nunca a senha (campo redigido por configuração).',
+		},
+		{
+			name: 'A10 — Vulnerável',
+			description:
+				'Uma tarefa assíncrona é disparada sem `await` nem `.catch` — a Promise rejeitada não é tratada por ninguém (`unhandledRejection`).',
+		},
+		{
+			name: 'A10 — Protegido',
+			description:
+				"A mesma operação, mas aguardada dentro de um `try/catch` com log estruturado do erro. `src/index.ts` também registra `process.on('unhandledRejection')` e `process.on('uncaughtException')` como rede de segurança.",
+		},
 	],
 	paths: {
 		'/a01/login': {
@@ -592,6 +642,317 @@ export const swaggerSpec = {
 							},
 						},
 					},
+				},
+			},
+		},
+		'/a06/vulnerable/login': {
+			post: {
+				tags: ['A06 — Vulnerável'],
+				summary: '[User Enumeration] Mensagens de erro revelam se o e-mail existe',
+				description:
+					'**Vulnerabilidade:** `404 "Email não encontrado"` vs `401 "Senha incorreta"` — um atacante consegue mapear quais e-mails estão cadastrados testando senhas aleatórias, e não há limite de tentativas.\n\n**Teste:** registre um usuário em `/a04/protected/register` e tente e-mails que existem e que não existem aqui.',
+				requestBody: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: {
+								type: 'object',
+								required: ['email', 'password'],
+								properties: {
+									email: { type: 'string', example: 'eve@example.com' },
+									password: { type: 'string', example: 'senha-errada' },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					200: { description: 'Login efetuado' },
+					401: { description: 'Senha incorreta (e-mail existe)' },
+					404: { description: 'Email não encontrado (e-mail não existe)' },
+				},
+			},
+		},
+		'/a06/protected/login': {
+			post: {
+				tags: ['A06 — Protegido'],
+				summary: '[Fail Securely + Rate Limit] Mensagem genérica e bloqueio temporário',
+				description:
+					'**Proteções:**\n- Mensagem `401 "Email ou senha incorretos"` idêntica em ambos os casos — não dá para enumerar e-mails\n- `express-rate-limit`: no máximo 5 requisições a cada 15min por IP (`429`)\n- Bloqueio adicional de 1 minuto por e-mail após 5 falhas seguidas (`node-cache`)\n\n**Teste:** erre a senha 5 vezes seguidas para o mesmo e-mail e veja o `429`.',
+				requestBody: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: {
+								type: 'object',
+								required: ['email', 'password'],
+								properties: {
+									email: { type: 'string', example: 'eve@example.com' },
+									password: { type: 'string', example: 'senha-errada' },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					200: { description: 'Login efetuado' },
+					401: { description: 'Email ou senha incorretos' },
+					429: { description: 'Bloqueado por rate limit (IP) ou lockout (e-mail)' },
+				},
+			},
+		},
+		'/a07/vulnerable/login': {
+			post: {
+				tags: ['A07 — Vulnerável'],
+				summary: '[No Expiration] Emite JWT sem expiração',
+				description: '**Vulnerabilidade:** o token não tem `expiresIn` — uma vez emitido, é válido para sempre.',
+				requestBody: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: {
+								type: 'object',
+								required: ['email', 'password'],
+								properties: {
+									email: { type: 'string', example: 'eve@example.com' },
+									password: { type: 'string', example: 'minhasenha123' },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					200: { description: 'Token sem expiração' },
+					401: { description: 'Credenciais inválidas' },
+				},
+			},
+		},
+		'/a07/vulnerable/logout': {
+			post: {
+				tags: ['A07 — Vulnerável'],
+				summary: '[No Revocation] "Logout" que não revoga nada',
+				description: '**Vulnerabilidade:** não existe blocklist — o token usado antes do logout continua funcionando normalmente em `/a07/vulnerable/profile`.',
+				responses: {
+					200: { description: 'Resposta de logout — mas o token continua válido' },
+				},
+			},
+		},
+		'/a07/vulnerable/profile': {
+			get: {
+				tags: ['A07 — Vulnerável'],
+				summary: 'Retorna o perfil do token — mesmo após o "logout"',
+				security: [{ bearerAuth: [] }],
+				responses: {
+					200: { description: 'Perfil retornado — token aceito mesmo após logout' },
+					401: { description: 'Token ausente ou inválido' },
+				},
+			},
+		},
+		'/a07/protected/login': {
+			post: {
+				tags: ['A07 — Protegido'],
+				summary: '[Short-lived JWT] Access token de 15min + refresh token',
+				description:
+					'**Proteção:** `accessToken` expira em 15min. `refreshToken` é opaco, de uso único, e serve só para obter um novo par de tokens em `/a07/protected/refresh`.',
+				requestBody: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: {
+								type: 'object',
+								required: ['email', 'password'],
+								properties: {
+									email: { type: 'string', example: 'eve@example.com' },
+									password: { type: 'string', example: 'minhasenha123' },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					200: { description: 'Access token (15min) + refresh token emitidos' },
+					401: { description: 'Credenciais inválidas' },
+				},
+			},
+		},
+		'/a07/protected/refresh': {
+			post: {
+				tags: ['A07 — Protegido'],
+				summary: '[Refresh] Troca um refresh token válido por um novo par de tokens',
+				description: '**Proteção:** o refresh token é consumido (uso único) — reutilizá-lo depois falha, mesmo que tenha sido roubado.',
+				requestBody: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: {
+								type: 'object',
+								required: ['refreshToken'],
+								properties: {
+									refreshToken: { type: 'string' },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					200: { description: 'Novo access token + refresh token' },
+					401: { description: 'Refresh token inválido, expirado ou já utilizado' },
+				},
+			},
+		},
+		'/a07/protected/logout': {
+			post: {
+				tags: ['A07 — Protegido'],
+				summary: '[Revocation] Revoga o access token (blocklist) e o refresh token',
+				description: '**Proteção:** após o logout, o mesmo access token é rejeitado em `/a07/protected/profile` com 401.',
+				security: [{ bearerAuth: [] }],
+				requestBody: {
+					required: false,
+					content: {
+						'application/json': {
+							schema: {
+								type: 'object',
+								properties: {
+									refreshToken: { type: 'string' },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					200: { description: 'Logout efetuado — token revogado' },
+					401: { description: 'Token ausente ou inválido' },
+				},
+			},
+		},
+		'/a07/protected/profile': {
+			get: {
+				tags: ['A07 — Protegido'],
+				summary: 'Retorna o perfil — rejeitado se o token foi revogado',
+				security: [{ bearerAuth: [] }],
+				responses: {
+					200: { description: 'Perfil retornado' },
+					401: { description: 'Token ausente, inválido, expirado ou revogado' },
+				},
+			},
+		},
+		'/a08/vulnerable/config': {
+			post: {
+				tags: ['A08 — Vulnerável'],
+				summary: '[No Integrity Check] Aplica qualquer payload recebido',
+				description: '**Vulnerabilidade:** nenhuma verificação de origem ou assinatura — qualquer remetente consegue alterar o estado da aplicação.',
+				requestBody: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: { type: 'object', example: { featureFlag: 'novo-checkout', enabled: true } },
+						},
+					},
+				},
+				responses: {
+					200: { description: 'Payload aplicado sem verificação' },
+				},
+			},
+		},
+		'/a08/protected/config': {
+			post: {
+				tags: ['A08 — Protegido'],
+				summary: '[HMAC Signature] Só aplica o payload se a assinatura bater',
+				description:
+					'**Proteção:** o header `x-signature` deve ser o HMAC-SHA256 (hex) do corpo da requisição, assinado com `INTEGRITY_SECRET`. Comparação feita com `crypto.timingSafeEqual`.\n\n**Como gerar a assinatura localmente:**\n```bash\nnode -e "console.log(require(\'crypto\').createHmac(\'sha256\',\'dev-integrity-secret-change-me\').update(JSON.stringify({featureFlag:\'novo-checkout\',enabled:true})).digest(\'hex\'))"\n```\nUse o mesmo objeto como corpo da requisição e o resultado como header `x-signature`.',
+				parameters: [
+					{
+						name: 'x-signature',
+						in: 'header',
+						required: true,
+						description: 'HMAC-SHA256 (hex) do corpo da requisição',
+						schema: { type: 'string' },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: { type: 'object', example: { featureFlag: 'novo-checkout', enabled: true } },
+						},
+					},
+				},
+				responses: {
+					200: { description: 'Payload aplicado — assinatura verificada' },
+					401: { description: 'Assinatura ausente ou inválida' },
+				},
+			},
+		},
+		'/a09/vulnerable/login': {
+			post: {
+				tags: ['A09 — Vulnerável'],
+				summary: '[No Logging] console.log com a senha; erros engolidos',
+				description: '**Vulnerabilidade:** a senha é registrada em texto puro no console e exceções inesperadas são silenciadas sem nenhum registro — impossível investigar um incidente depois.',
+				requestBody: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: {
+								type: 'object',
+								required: ['email', 'password'],
+								properties: {
+									email: { type: 'string', example: 'eve@example.com' },
+									password: { type: 'string', example: 'minhasenha123' },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					200: { description: 'Login efetuado' },
+					401: { description: 'Credenciais inválidas (sem registro em log)' },
+				},
+			},
+		},
+		'/a09/protected/login': {
+			post: {
+				tags: ['A09 — Protegido'],
+				summary: '[Structured Logging] pino registra tentativas sem expor a senha',
+				description: '**Proteção:** `logger.info`/`logger.warn`/`logger.error` em JSON, com e-mail e IP — a senha nunca é passada ao logger (e o campo é redigido por configuração como defesa extra).',
+				requestBody: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: {
+								type: 'object',
+								required: ['email', 'password'],
+								properties: {
+									email: { type: 'string', example: 'eve@example.com' },
+									password: { type: 'string', example: 'minhasenha123' },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					200: { description: 'Login efetuado — tentativa registrada em log estruturado' },
+					401: { description: 'Credenciais inválidas — falha registrada em log estruturado' },
+				},
+			},
+		},
+		'/a10/vulnerable/process': {
+			post: {
+				tags: ['A10 — Vulnerável'],
+				summary: '[Unhandled Rejection] Promise disparada sem await nem catch',
+				description:
+					'**Vulnerabilidade:** a tarefa assíncrona roda solta — a rejeição não é tratada por ninguém no código da rota. Sem os handlers globais de `src/index.ts`, isso derrubaria o processo inteiro (todas as rotas, não só essa).\n\n**Observe o terminal do servidor** após chamar essa rota — o `unhandled_rejection` aparece no log via o handler global.',
+				responses: {
+					202: { description: 'Resposta enviada antes da tarefa em background falhar' },
+				},
+			},
+		},
+		'/a10/protected/process': {
+			post: {
+				tags: ['A10 — Protegido'],
+				summary: '[try/catch] Aguarda a tarefa e trata o erro no próprio ponto',
+				description: '**Proteção:** `await` dentro de `try/catch` — o erro é capturado e logado exatamente onde acontece, sem depender da rede de segurança global.',
+				responses: {
+					202: { description: 'Processamento concluído — falha (se houve) tratada e registrada' },
 				},
 			},
 		},

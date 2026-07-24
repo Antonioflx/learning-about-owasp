@@ -1,13 +1,14 @@
 import cors from 'cors'
 import type { ErrorRequestHandler } from 'express'
 import helmet from 'helmet'
+import { config } from '@/config/env.config.js'
 
 // VULNERÁVEL — CORS aberto: qualquer origem pode fazer requisições
 export const vulnerableCors = cors()
 
 // PROTEGIDO — CORS restrito a origens conhecidas
 export const protectedCors = cors({
-	origin: process.env.ALLOWED_ORIGIN ?? 'http://localhost:3000',
+	origin: config.allowedOrigin,
 	methods: ['GET', 'POST', 'DELETE'],
 })
 

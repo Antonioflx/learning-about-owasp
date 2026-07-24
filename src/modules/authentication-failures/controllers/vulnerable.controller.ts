@@ -5,20 +5,11 @@ import { config } from '@/config/env.config.js'
 import { UnauthorizedError } from '@/modules/errors/http-error.entity.js'
 import { HttpResponse } from '@/modules/response/http-response.js'
 import { findUserForAuth } from '@/modules/user/use-cases/find-user-for-auth.use-case.js'
-import { registerUser } from '@/modules/user/use-cases/register-user.use-case.js'
+import type { UserEntity } from '@/modules/user/user.entity.js'
 
-const SALT_ROUNDS = 12
 const secret = new TextEncoder().encode(config.jwtSecret)
 
-// PROTEGIDO — bcrypt gera hash irreversível com salt aleatório
-export async function register(req: Request, res: Response) {
-	const { name, email, password } = req.body as { name: string; email: string; password: string }
-	const passwordHash = await bcrypt.hash(password, SALT_ROUNDS)
-	await registerUser({ name, email, passwordHash })
-	new HttpResponse(res).created<{ message: string }>({ message: 'Usuário criado' })
-}
-
-// PROTEGIDO — bcrypt.compare, JWT via env, expiração 2h, nunca retorna hash
+// VULNERÁVEL — sem setExpirationTime: o token é válido para sempre
 export async function login(req: Request, res: Response) {
 	const { email, password } = req.body as { email: string; password: string }
 	const result = await findUserForAuth(email)
@@ -28,10 +19,26 @@ export async function login(req: Request, res: Response) {
 	}
 
 	const { user } = result
-	const token = await new SignJWT({ id: user.id, name: user.name, email: user.email, role: user.role })
+	const token = await new SignJWT({
+		id: user.id,
+		name: user.name,
+		email: user.email,
+		role: user.role,
+	})
 		.setProtectedHeader({ alg: 'HS256' })
-		.setExpirationTime('2h')
 		.sign(secret)
 
-	new HttpResponse(res).ok<{ token: string }>({ token })
+	new HttpResponse(res).ok({ token })
+}
+
+// VULNERÁVEL — não revoga nada; o token segue funcionando normalmente depois do "logout"
+export function logout(_req: Request, res: Response) {
+	new HttpResponse(res).ok({
+		message: 'Logout efetuado (mas o token continua válido)',
+	})
+}
+
+// VULNERÁVEL — aceita qualquer token com assinatura válida, mesmo depois do "logout"
+export function profile(req: Request, res: Response) {
+	new HttpResponse(res).ok<UserEntity>(req.user as UserEntity)
 }

@@ -13,6 +13,8 @@ Cada vulnerabilidade é implementada duas vezes — uma rota **vulnerável** (o 
 - **Banco:** PostgreSQL (`pg`)
 - **Auth:** JWT via `jose`
 - **Docs:** Swagger UI (`swagger-ui-express`)
+- **Logs:** `pino` / `pino-http`
+- **Rate limit:** `express-rate-limit` + `node-cache`
 - **Lint/Format:** Biome
 
 ---
@@ -21,6 +23,9 @@ Cada vulnerabilidade é implementada duas vezes — uma rota **vulnerável** (o 
 
 ```
 src/
+├── config/
+│   ├── env.config.ts          # valida e tipa as variáveis de ambiente (zod)
+│   └── logger.ts              # instância pino compartilhada (A09)
 ├── db/
 │   ├── client.ts              # conexão PostgreSQL
 │   ├── migrate.ts             # criação das tabelas
@@ -41,6 +46,29 @@ src/
 │   │   ├── lib/               # malicious-util.ts, safe-util.ts
 │   │   └── routes.ts
 │   ├── cryptographic-failures/ # A04 — Cryptographic Failures
+│   │   ├── controllers/
+│   │   └── routes.ts
+│   ├── injection/              # A05 — Injection
+│   │   ├── controllers/
+│   │   └── routes.ts
+│   ├── insecure-design/        # A06 — Insecure Design
+│   │   ├── controllers/
+│   │   ├── lib/                # login-attempts.store.ts (lockout por e-mail)
+│   │   ├── middleware/         # rate limiter por IP
+│   │   └── routes.ts
+│   ├── authentication-failures/ # A07 — Authentication Failures
+│   │   ├── controllers/
+│   │   ├── lib/                # token-blocklist.ts, refresh-token.store.ts
+│   │   ├── middleware/         # AuthGuard (verifyTokenInsecure/Secure)
+│   │   └── routes.ts
+│   ├── data-integrity/         # A08 — Software or Data Integrity Failures
+│   │   ├── controllers/
+│   │   ├── lib/                # hmac.ts (sign/verify)
+│   │   └── routes.ts
+│   ├── logging/                # A09 — Security Logging and Alerting Failures
+│   │   ├── controllers/
+│   │   └── routes.ts
+│   ├── exceptional-conditions/ # A10 — Mishandling of Exceptional Conditions
 │   │   ├── controllers/
 │   │   └── routes.ts
 │   ├── errors/
@@ -79,6 +107,25 @@ npm run dev
 
 Acesse a documentação interativa em `http://localhost:3000/docs`.
 
+As variáveis de ambiente são validadas e tipadas em [src/config/env.config.ts](src/config/env.config.ts) — se faltar alguma variável obrigatória (ex: `JWT_SECRET`), a aplicação falha ao subir com uma mensagem indicando o que está errado, em vez de quebrar silenciosamente em runtime.
+
+### Docker
+
+```bash
+cp .env.example .env   # preencher as variáveis
+
+docker compose up --build
+```
+
+Sobe dois serviços: `postgres` e `api` (build a partir de [docker/Dockerfile](docker/Dockerfile), multi-stage). Ambos têm healthcheck — a API só inicia depois que o Postgres reporta `healthy` (`depends_on: condition: service_healthy`), e o próprio container da API expõe `GET /health` (checa a conexão com o banco) como `HEALTHCHECK` da imagem.
+
+Depois de subir, rode as migrations dentro do container ou apontando `DATABASE_URL` para `localhost:5432` a partir do host:
+
+```bash
+npm run db:migrate
+npm run db:seed
+```
+
 ---
 
 ## Convenção de commits
@@ -102,11 +149,11 @@ chore:    tarefas de manutenção (deps, config, build)
 | A03 | Software Supply Chain Failures | ✅ |
 | A04 | Cryptographic Failures | ✅ |
 | A05 | Injection | ✅ |
-| A06 | Insecure Design | 🔜 |
-| A07 | Authentication Failures | 🔜 |
-| A08 | Software or Data Integrity Failures | 🔜 |
-| A09 | Security Logging and Alerting Failures | 🔜 |
-| A10 | Mishandling of Exceptional Conditions | 🔜 |
+| A06 | Insecure Design | ✅ |
+| A07 | Authentication Failures | ✅ |
+| A08 | Software or Data Integrity Failures | ✅ |
+| A09 | Security Logging and Alerting Failures | ✅ |
+| A10 | Mishandling of Exceptional Conditions | ✅ |
 
 ### A01 — Broken Access Control
 
@@ -169,6 +216,64 @@ Input do usuário enviado diretamente a interpretadores (SQL, shell).
 
 **Rotas protegidas** (`/a05/protected/...`)
 - `GET /protected/users?email=` — `zod` valida o email; query usa `$1` (parameterizada) — injeção impossível
+
+### A06 — Insecure Design
+
+Falhas arquiteturais: enumeração de usuários pela resposta e ausência de limite de tentativas.
+
+**Rotas vulneráveis** (`/a06/vulnerable/...`)
+- `POST /vulnerable/login` — `404 "Email não encontrado"` vs `401 "Senha incorreta"` permite mapear e-mails cadastrados; sem rate limit
+
+**Rotas protegidas** (`/a06/protected/...`)
+- `POST /protected/login` — mensagem genérica (`fail securely`), `express-rate-limit` (5 req/15min por IP) + bloqueio de 1min por e-mail após 5 falhas (`node-cache`)
+
+### A07 — Authentication Failures
+
+Ciclo de vida de sessão mal implementado: token eterno e logout que não revoga nada.
+
+**Rotas vulneráveis** (`/a07/vulnerable/...`)
+- `POST /vulnerable/login` — JWT assinado sem `expiresIn`, válido para sempre
+- `POST /vulnerable/logout` — não invalida nada
+- `GET /vulnerable/profile` — aceita o token normalmente mesmo depois do "logout"
+
+**Rotas protegidas** (`/a07/protected/...`)
+- `POST /protected/login` — access token de 15min + refresh token opaco de uso único
+- `POST /protected/refresh` — troca o refresh token (consumido no processo) por um novo par
+- `POST /protected/logout` — revoga o access token (blocklist em memória) e o refresh token
+- `GET /protected/profile` — rejeita token revogado ou expirado
+
+### A08 — Software or Data Integrity Failures
+
+Payload processado sem verificar origem ou integridade.
+
+**Rotas vulneráveis** (`/a08/vulnerable/...`)
+- `POST /vulnerable/config` — aplica qualquer JSON recebido, sem checar remetente
+
+**Rotas protegidas** (`/a08/protected/...`)
+- `POST /protected/config` — exige header `x-signature` com HMAC-SHA256 do payload (`crypto.createHmac` + `crypto.timingSafeEqual`); rejeita se não bater
+
+### A09 — Security Logging and Alerting Failures
+
+Logs ausentes ou insuficientes impedem detectar e investigar ataques.
+
+**Rotas vulneráveis** (`/a09/vulnerable/...`)
+- `POST /vulnerable/login` — `console.log` grava a senha em texto puro; erros inesperados são engolidos sem registro
+
+**Rotas protegidas** (`/a09/protected/...`)
+- `POST /protected/login` — logger estruturado `pino` (JSON): registra sucesso/falha de login e erros com IP, nunca a senha (campo redigido por config)
+
+### A10 — Mishandling of Exceptional Conditions
+
+Promise disparada sem tratamento — o tipo de erro que derruba um processo inteiro.
+
+**Rotas vulneráveis** (`/a10/vulnerable/...`)
+- `POST /vulnerable/process` — dispara uma tarefa assíncrona sem `await`/`.catch`; gera um `unhandledRejection` não tratado no ponto onde acontece
+
+**Rotas protegidas** (`/a10/protected/...`)
+- `POST /protected/process` — mesma tarefa, mas com `try/catch` e log estruturado do erro
+
+**Rede de segurança global** (`src/index.ts`)
+- `process.on('unhandledRejection', ...)` e `process.on('uncaughtException', ...)` — logam via `pino` e, no caso de `uncaughtException`, encerram o processo de forma controlada (`process.exit(1)`) em vez de deixá-lo em estado indefinido
 
 ---
 

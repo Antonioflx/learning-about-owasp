@@ -31,3 +31,9 @@ export class NotFoundError extends HttpError {
 		super(404, message)
 	}
 }
+
+export class TooManyRequestsError extends HttpError {
+	constructor(message = 'Muitas tentativas — tente novamente mais tarde') {
+		super(429, message)
+	}
+}
